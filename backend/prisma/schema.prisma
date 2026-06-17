@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  owner
+  manager
+  tailor
+}
+
+enum WorkstationSpecialty {
+  formal
+  bridal
+  casual
+  leather
+  denim
+  specialty
+}
+
+enum WorkstationStatus {
+  available
+  in_use
+  cleaning
+  maintenance
+  closed
+}
+
+enum JobStatus {
+  recorded
+  verified
+  disputed
+}
+
+enum JobType {
+  hem
+  suit
+  wedding_dress
+  leather
+  denim
+  rush
+}
+
+enum EquipmentPriority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum EquipmentStatus {
+  open
+  in_progress
+  completed
+  cancelled
+}
+
+enum ChecklistCategory {
+  final_press
+  stitch_inspection
+  fitting_prep
+  button_check
+  lining_review
+  other
+}
+
+enum ChecklistStatus {
+  scheduled
+  in_progress
+  completed
+  overdue
+}
+
+enum ServiceCategory {
+  basic_alteration
+  bridal_package
+  rush_service
+  leather_work
+  custom_fitting
+  other
+}
+
+enum ServiceRateStatus {
+  active
+  upcoming
+  archived
+}
+
+enum FabricOrderStatus {
+  pending
+  in_progress
+  completed
+  delivered
+}
+
+model TailoringShop {
+  id                String   @id @default(uuid())
+  name              String
+  phone             String?
+  address           String?
+  city              String?
+  state             String?
+  zipCode           String?  @map("zip_code")
+  totalWorkstations Int      @default(6) @map("total_workstations")
+  timezone          String   @default("America/Chicago")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  users                User[]
+  workstations         Workstation[]
+  alterationJobs       AlterationJob[]
+  equipmentMaintenance EquipmentMaintenance[]
+  qualityChecklists    QualityChecklist[]
+  serviceRates         ServiceRate[]
+  fabricOrders         FabricOrder[]
+
+  @@map("tailoring_shops")
+}
+
+model User {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  passwordHash    String   @map("password_hash")
+  firstName       String   @map("first_name")
+  lastName        String   @map("last_name")
+  role            UserRole @default(owner)
+  tailoringShopId String   @map("tailoring_shop_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tailoringShop TailoringShop @relation(fields: [tailoringShopId], references: [id], onDelete: Cascade)
+
+  @@map("users")
+}
+
+model Workstation {
+  id              String               @id @default(uuid())
+  tailoringShopId String               @map("tailoring_shop_id")
+  name            String
+  zone            String
+  specialty       WorkstationSpecialty @default(formal)
+  machineModel    String?              @map("machine_model")
+  status          WorkstationStatus    @default(available)
+  notes           String?
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  tailoringShop        TailoringShop          @relation(fields: [tailoringShopId], references: [id], onDelete: Cascade)
+  alterationJobs       AlterationJob[]
+  equipmentMaintenance EquipmentMaintenance[]
+
+  @@unique([tailoringShopId, name])
+  @@index([tailoringShopId, status])
+  @@map("workstations")
+}
+
+model AlterationJob {
+  id              String    @id @default(uuid())
+  tailoringShopId String    @map("tailoring_shop_id")
+  workstationId   String    @map("workstation_id")
+  dueAt           DateTime  @map("due_at")
+  jobType         JobType   @default(hem) @map("job_type")
+  cashAmount      Float     @default(0) @map("cash_amount")
+  cardAmount      Float     @default(0) @map("card_amount")
+  itemCount       Int       @default(1) @map("item_count")
+  rushFee         Float     @default(0) @map("rush_fee")
+  status          JobStatus @default(recorded)
+  notes           String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  tailoringShop TailoringShop @relation(fields: [tailoringShopId], references: [id], onDelete: Cascade)
+  workstation   Workstation   @relation(fields: [workstationId], references: [id], onDelete: Cascade)
+
+  @@index([tailoringShopId, dueAt])
+  @@index([tailoringShopId, status])
+  @@map("alteration_jobs")
+}
+
+model EquipmentMaintenance {
+  id              String            @id @default(uuid())
+  tailoringShopId String            @map("tailoring_shop_id")
+  workstationId   String            @map("workstation_id")
+  title           String
+  description     String?
+  reportedAt      DateTime          @map("reported_at")
+  completedAt     DateTime?         @map("completed_at")
+  priority        EquipmentPriority @default(medium)
+  status          EquipmentStatus   @default(open)
+  cost            Float?
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  tailoringShop TailoringShop @relation(fields: [tailoringShopId], references: [id], onDelete: Cascade)
+  workstation   Workstation   @relation(fields: [workstationId], references: [id], onDelete: Cascade)
+
+  @@index([tailoringShopId, status])
+  @@index([tailoringShopId, priority])
+  @@map("equipment_maintenance")
+}
+
+model QualityChecklist {
+  id              String            @id @default(uuid())
+  tailoringShopId String            @map("tailoring_shop_id")
+  title           String
+  description     String?
+  category        ChecklistCategory @default(other)
+  zone            String?
+  scheduledAt     DateTime          @map("scheduled_at")
+  status          ChecklistStatus   @default(scheduled)
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  tailoringShop TailoringShop @relation(fields: [tailoringShopId], references: [id], onDelete: Cascade)
+
+  @@index([tailoringShopId, scheduledAt])
+  @@map("quality_checklists")
+}
+
+model ServiceRate {
+  id              String            @id @default(uuid())
+  tailoringShopId String            @map("tailoring_shop_id")
+  title           String
+  rateCategory    ServiceCategory   @default(basic_alteration) @map("rate_category")
+  status          ServiceRateStatus @default(active)
+  basePrice       Float             @map("base_price")
+  priceMultiplier Float             @default(1.0) @map("price_multiplier")
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  tailoringShop TailoringShop @relation(fields: [tailoringShopId], references: [id], onDelete: Cascade)
+
+  @@index([tailoringShopId, rateCategory])
+  @@map("service_rates")
+}
+
+model FabricOrder {
+  id              String            @id @default(uuid())
+  tailoringShopId String            @map("tailoring_shop_id")
+  customerName    String            @map("customer_name")
+  fabricType      String            @map("fabric_type")
+  supplierName    String?           @map("supplier_name")
+  status          FabricOrderStatus @default(pending)
+  price           Float             @default(0)
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  tailoringShop TailoringShop @relation(fields: [tailoringShopId], references: [id], onDelete: Cascade)
+
+  @@index([tailoringShopId, status])
+  @@map("fabric_orders")
+}
